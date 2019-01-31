@@ -125,34 +125,7 @@ RCT_EXPORT_MODULE();
   return basePath;
 }
 
-RCT_EXPORT_METHOD(prepareRecordingAtPath:(NSString *)path sampleRate:(float)sampleRate channels:(nonnull NSNumber *)channels quality:(NSString *)quality encoding:(NSString *)encoding meteringEnabled:(BOOL)meteringEnabled measurementMode:(BOOL)measurementMode includeBase64:(BOOL)includeBase64)
-{
-  _prevProgressUpdateTime = nil;
-  [self stopProgressTimer];
-    
-  NSString *filePathAndDirectory = [path stringByDeletingLastPathComponent];
-  NSError *error=nil;
-  //create parent dirs if necessary
-  if (![[NSFileManager defaultManager] createDirectoryAtPath:filePathAndDirectory
-                                 withIntermediateDirectories:YES
-                                                  attributes:nil
-                                                       error:&error])
-  {
-    NSLog(@"Create directory error: %@", error);
-  }
-    
-  _audioFileURL = [NSURL fileURLWithPath:path];
-  
-  // Default options
-  _audioQuality = [NSNumber numberWithInt:AVAudioQualityHigh];
-  _audioEncoding = [NSNumber numberWithInt:kAudioFormatAppleIMA4];
-  _audioChannels = [NSNumber numberWithInt:2];
-  _audioSampleRate = [NSNumber numberWithFloat:44100.0];
-  _meteringEnabled = NO;
-  _includeBase64 = NO;
-
-  // Set audio quality from options
-  if (quality != nil) {
+- (void) setAudioQuality: (NSString *)quality {
     if ([quality  isEqual: @"Low"]) {
       _audioQuality =[NSNumber numberWithInt:AVAudioQualityLow];
     } else if ([quality  isEqual: @"Medium"]) {
@@ -160,69 +133,43 @@ RCT_EXPORT_METHOD(prepareRecordingAtPath:(NSString *)path sampleRate:(float)samp
     } else if ([quality  isEqual: @"High"]) {
       _audioQuality =[NSNumber numberWithInt:AVAudioQualityHigh];
     }
+}
+
+- (void) setAudioEncoding: (NSString *)encoding {
+  if ([encoding  isEqual: @"lpcm"]) {
+    _audioEncoding =[NSNumber numberWithInt:kAudioFormatLinearPCM];
+  } else if ([encoding  isEqual: @"ima4"]) {
+    _audioEncoding =[NSNumber numberWithInt:kAudioFormatAppleIMA4];
+  } else if ([encoding  isEqual: @"aac"]) {
+    _audioEncoding =[NSNumber numberWithInt:kAudioFormatMPEG4AAC];
+  } else if ([encoding  isEqual: @"MAC3"]) {
+    _audioEncoding =[NSNumber numberWithInt:kAudioFormatMACE3];
+  } else if ([encoding  isEqual: @"MAC6"]) {
+    _audioEncoding =[NSNumber numberWithInt:kAudioFormatMACE6];
+  } else if ([encoding  isEqual: @"ulaw"]) {
+    _audioEncoding =[NSNumber numberWithInt:kAudioFormatULaw];
+  } else if ([encoding  isEqual: @"alaw"]) {
+    _audioEncoding =[NSNumber numberWithInt:kAudioFormatALaw];
+  } else if ([encoding  isEqual: @"mp1"]) {
+    _audioEncoding =[NSNumber numberWithInt:kAudioFormatMPEGLayer1];
+  } else if ([encoding  isEqual: @"mp2"]) {
+    _audioEncoding =[NSNumber numberWithInt:kAudioFormatMPEGLayer2];
+  } else if ([encoding  isEqual: @"alac"]) {
+    _audioEncoding =[NSNumber numberWithInt:kAudioFormatAppleLossless];
+  } else if ([encoding  isEqual: @"amr"]) {
+    _audioEncoding =[NSNumber numberWithInt:kAudioFormatAMR];
+  } else if ([encoding  isEqual: @"flac"]) {
+      if (@available(iOS 11, *)) _audioEncoding =[NSNumber numberWithInt:kAudioFormatFLAC];
+  } else if ([encoding  isEqual: @"opus"]) {
+      if (@available(iOS 11, *)) _audioEncoding =[NSNumber numberWithInt:kAudioFormatOpus];
   }
+}
 
-  // Set channels from options
-  if (channels != nil) {
-    _audioChannels = channels;
-  }
+- (void) initAudioRecorderWithSettings: (NSDictionary*) recordSettings {
+  _prevProgressUpdateTime = nil;
+  [self stopProgressTimer];
 
-  // Set audio encoding from options
-  if (encoding != nil) {
-    if ([encoding  isEqual: @"lpcm"]) {
-      _audioEncoding =[NSNumber numberWithInt:kAudioFormatLinearPCM];
-    } else if ([encoding  isEqual: @"ima4"]) {
-      _audioEncoding =[NSNumber numberWithInt:kAudioFormatAppleIMA4];
-    } else if ([encoding  isEqual: @"aac"]) {
-      _audioEncoding =[NSNumber numberWithInt:kAudioFormatMPEG4AAC];
-    } else if ([encoding  isEqual: @"MAC3"]) {
-      _audioEncoding =[NSNumber numberWithInt:kAudioFormatMACE3];
-    } else if ([encoding  isEqual: @"MAC6"]) {
-      _audioEncoding =[NSNumber numberWithInt:kAudioFormatMACE6];
-    } else if ([encoding  isEqual: @"ulaw"]) {
-      _audioEncoding =[NSNumber numberWithInt:kAudioFormatULaw];
-    } else if ([encoding  isEqual: @"alaw"]) {
-      _audioEncoding =[NSNumber numberWithInt:kAudioFormatALaw];
-    } else if ([encoding  isEqual: @"mp1"]) {
-      _audioEncoding =[NSNumber numberWithInt:kAudioFormatMPEGLayer1];
-    } else if ([encoding  isEqual: @"mp2"]) {
-      _audioEncoding =[NSNumber numberWithInt:kAudioFormatMPEGLayer2];
-    } else if ([encoding  isEqual: @"alac"]) {
-      _audioEncoding =[NSNumber numberWithInt:kAudioFormatAppleLossless];
-    } else if ([encoding  isEqual: @"amr"]) {
-      _audioEncoding =[NSNumber numberWithInt:kAudioFormatAMR];
-    } else if ([encoding  isEqual: @"flac"]) {
-        if (@available(iOS 11, *)) _audioEncoding =[NSNumber numberWithInt:kAudioFormatFLAC];
-    } else if ([encoding  isEqual: @"opus"]) {
-        if (@available(iOS 11, *)) _audioEncoding =[NSNumber numberWithInt:kAudioFormatOpus];
-    }
-  }
-
-    
-  // Set sample rate from options
-  _audioSampleRate = [NSNumber numberWithFloat:sampleRate];
-
-  NSDictionary *recordSettings = [NSDictionary dictionaryWithObjectsAndKeys:
-          _audioQuality, AVEncoderAudioQualityKey,
-          _audioEncoding, AVFormatIDKey,
-          _audioChannels, AVNumberOfChannelsKey,
-          _audioSampleRate, AVSampleRateKey,
-          nil];
-
-  // Enable metering from options
-  if (meteringEnabled != NO) {
-    _meteringEnabled = meteringEnabled;
-  }
-
-  // Measurement mode to disable mic auto gain and high pass filters
-  if (measurementMode != NO) {
-    _measurementMode = measurementMode;
-  }
-
-  if (includeBase64) {
-    _includeBase64 = includeBase64;
-  }
-
+  NSError *error = nil;
 
   _recordSession = [AVAudioSession sharedInstance];
 
@@ -249,6 +196,134 @@ RCT_EXPORT_METHOD(prepareRecordingAtPath:(NSString *)path sampleRate:(float)samp
   }
 }
 
+
+
+RCT_EXPORT_METHOD(prepareRecordingAtPath:(NSString *)path sampleRate:(float)sampleRate channels:(nonnull NSNumber *)channels quality:(NSString *)quality encoding:(NSString *)encoding meteringEnabled:(BOOL)meteringEnabled measurementMode:(BOOL)measurementMode includeBase64:(BOOL)includeBase64)
+{
+  _audioFileURL = [NSURL fileURLWithPath:path];
+  
+  // Default options
+  _audioQuality = [NSNumber numberWithInt:AVAudioQualityHigh];
+  _audioEncoding = [NSNumber numberWithInt:kAudioFormatAppleIMA4];
+  _audioChannels = [NSNumber numberWithInt:2];
+  _audioSampleRate = [NSNumber numberWithFloat:44100.0];
+  _meteringEnabled = NO;
+  _includeBase64 = NO;
+
+  // Set audio quality from options
+  if (quality != nil) {
+    [self setAudioQuality: quality];
+  }
+
+  // Set channels from options
+  if (channels != nil) {
+    _audioChannels = channels;
+  }
+
+  // Set audio encoding from options
+  if (encoding != nil) {
+    [self setAudioEncoding: quality];
+  }
+
+    
+  // Set sample rate from options
+  _audioSampleRate = [NSNumber numberWithFloat:sampleRate];
+
+  NSDictionary *recordSettings = [NSDictionary dictionaryWithObjectsAndKeys:
+          _audioQuality, AVEncoderAudioQualityKey,
+          _audioEncoding, AVFormatIDKey,
+          _audioChannels, AVNumberOfChannelsKey,
+          _audioSampleRate, AVSampleRateKey,
+          nil];
+  // Enable metering from options
+  if (meteringEnabled != NO) {
+    _meteringEnabled = meteringEnabled;
+  }
+
+  // Measurement mode to disable mic auto gain and high pass filters
+  if (measurementMode != NO) {
+    _measurementMode = measurementMode;
+  }
+
+  if (includeBase64) {
+    _includeBase64 = includeBase64;
+  }
+
+  [self initAudioRecorderWithSettings: recordSettings];
+}
+
+RCT_EXPORT_METHOD(prepareRecordingAtPathWithSettings:(NSString *)path settings:(NSDictionary*) settings)
+{
+  _audioFileURL = [NSURL fileURLWithPath:path];
+  
+  // Default options
+  _audioQuality = [NSNumber numberWithInt:AVAudioQualityHigh];
+  _audioEncoding = [NSNumber numberWithInt:kAudioFormatAppleIMA4];
+  _audioChannels = [NSNumber numberWithInt:2];
+  _audioSampleRate = [NSNumber numberWithFloat:44100.0];
+  _meteringEnabled = NO;
+  _includeBase64 = NO;
+  
+  // Set audio quality from options
+  NSString* quality = [RCTConvert NSString:settings[@"AudioQuality"]];
+  if (quality != nil) {
+    [self setAudioQuality: quality];
+  }
+  
+  // Set channels from options
+  
+  NSNumber* channels = [RCTConvert NSNumber:settings[@"Channels"]];
+  if (channels != nil) {
+    _audioChannels = channels;
+  }
+  
+  // Set audio encoding from options
+  NSString* encoding = [RCTConvert NSString:settings[@"AudioEncoding"]];
+  if (encoding != nil) {
+    [self setAudioEncoding: encoding];
+  }
+  
+  
+  // Set sample rate from options
+  NSNumber* sampleRate = [RCTConvert NSNumber:settings[@"SampleRate"]];
+  if (sampleRate != nil) {
+    _audioSampleRate = sampleRate;
+  }
+  
+  NSDictionary *recordSettings = [NSDictionary dictionaryWithObjectsAndKeys:
+                                  _audioQuality, AVEncoderAudioQualityKey,
+                                  _audioEncoding, AVFormatIDKey,
+                                  _audioChannels, AVNumberOfChannelsKey,
+                                  _audioSampleRate, AVSampleRateKey,
+                                  nil];
+  // Enable metering from options
+  BOOL meteringEnabled = [NSNumber numberWithBool:[RCTConvert NSNumber:settings[@"MeteringEnabled"]]];
+  if (meteringEnabled != NO) {
+    _meteringEnabled = meteringEnabled;
+  }
+  BOOL measurementMode = [NSNumber numberWithBool:[RCTConvert NSNumber:settings[@"MeasurementMode"]]];
+  // Measurement mode to disable mic auto gain and high pass filters
+  if (measurementMode != NO) {
+    _measurementMode = measurementMode;
+  }
+  BOOL includeBase64 = [NSNumber numberWithBool:[RCTConvert NSNumber:settings[@"IncludeBase64"]]];
+  if (includeBase64) {
+    _includeBase64 = includeBase64;
+  }
+  
+  NSDictionary *recordOptions = [[NSDictionary dictionaryWithObjectsAndKeys:
+                                         _audioQuality, AVEncoderAudioQualityKey,
+                                         _audioEncoding, AVFormatIDKey,
+                                         _audioChannels, AVNumberOfChannelsKey,
+                                         _audioSampleRate, AVSampleRateKey,
+                                         nil] mutableCopy];
+  
+  NSNumber* pcmBitDepthKey = [RCTConvert NSNumber:settings[@"AVLinearPCMBitDepthKey"]];
+  if (pcmBitDepthKey != nil) {
+    [recordOptions setValue:pcmBitDepthKey forKey:AVLinearPCMBitDepthKey];
+  }
+  [self initAudioRecorderWithSettings: recordOptions];
+}
 RCT_EXPORT_METHOD(startRecording)
 {
   [self startProgressTimer];
