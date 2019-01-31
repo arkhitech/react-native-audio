@@ -48,15 +48,8 @@ var AudioRecorder = {
     var recordingOptions = {...defaultOptions, ...options};
 
     if (Platform.OS === 'ios') {
-      AudioRecorderManager.prepareRecordingAtPath(
-        path,
-        recordingOptions.SampleRate,
-        recordingOptions.Channels,
-        recordingOptions.AudioQuality,
-        recordingOptions.AudioEncoding,
-        recordingOptions.MeteringEnabled,
-        recordingOptions.MeasurementMode,
-        recordingOptions.IncludeBase64
+      AudioRecorderManager.prepareRecordingAtPathWithSettings(
+        path, recordingOptions
       );
     } else {
       return AudioRecorderManager.prepareRecordingAtPath(path, recordingOptions);

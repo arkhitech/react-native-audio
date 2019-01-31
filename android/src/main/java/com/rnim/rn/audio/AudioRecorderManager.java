@@ -39,6 +39,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.IllegalAccessException;
 import java.lang.NoSuchMethodException;
+import android.media.AudioFormat;
 
 class AudioRecorderManager extends ReactContextBaseJavaModule {
 
@@ -122,8 +123,21 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
       recorder.setAudioSource(recordingSettings.getInt("AudioSource"));
       int outputFormat = getOutputFormatFromString(recordingSettings.getString("OutputFormat"));
       recorder.setOutputFormat(outputFormat);
-      int audioEncoder = getAudioEncoderFromString(recordingSettings.getString("AudioEncoding"));
-      recorder.setAudioEncoder(audioEncoder);
+      if("lpcm".equalsIgnoreCase(recordingSettings.getString("AudioEncoding"))
+        ) {
+        if(16 == recordingSettings.getInt("AVLinearPCMBitDepthKey")) {
+          recorder.setAudioEncoder(AudioFormat.ENCODING_PCM_16BIT);
+        } else if(32 == recordingSettings.getInt("AVLinearPCMBitDepthKey")) {
+          recorder.setAudioEncoder(AudioFormat.ENCODING_PCM_FLOAT);
+        } else if(8 == recordingSettings.getInt("AVLinearPCMBitDepthKey")) {
+          recorder.setAudioEncoder(AudioFormat.ENCODING_PCM_8BIT);
+        } else {
+          recorder.setAudioEncoder(AudioFormat.ENCODING_PCM_16BIT);
+        }
+      } else {      
+        int audioEncoder = getAudioEncoderFromString(recordingSettings.getString("AudioEncoding"));
+        recorder.setAudioEncoder(audioEncoder);
+      }
       recorder.setAudioSamplingRate(recordingSettings.getInt("SampleRate"));
       recorder.setAudioChannels(recordingSettings.getInt("Channels"));
       recorder.setAudioEncodingBitRate(recordingSettings.getInt("AudioEncodingBitRate"));
