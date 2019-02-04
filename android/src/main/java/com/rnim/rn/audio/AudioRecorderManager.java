@@ -12,17 +12,24 @@ import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.WritableMap;
 
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 
 import android.content.pm.PackageManager;
+import android.media.AudioRecord;
 import android.os.Build;
 import android.os.Environment;
 import android.media.MediaRecorder;
@@ -52,9 +59,12 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
   private static final String LibraryDirectoryPath = "LibraryDirectoryPath";
   private static final String MusicDirectoryPath = "MusicDirectoryPath";
   private static final String DownloadsDirectoryPath = "DownloadsDirectoryPath";
+  public static final String AUDIO_RECORDING_FILE_NAME = "recording.raw";
+  byte audioData[];
 
   private Context context;
   private MediaRecorder recorder;
+  private AudioRecord audioRecorder;
   private String currentOutputFile;
   private boolean isRecording = false;
   private boolean isPaused = false;
@@ -102,65 +112,90 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
   }
 
   @ReactMethod
-  public void checkAuthorizationStatus(Promise promise) {
-    int permissionCheck = ContextCompat.checkSelfPermission(getCurrentActivity(),
-            Manifest.permission.RECORD_AUDIO);
+  public void checkAuthorizationStatus(Promise promise)
+  {
+    int permissionCheck = ContextCompat.checkSelfPermission(getCurrentActivity(), Manifest.permission.RECORD_AUDIO);
     boolean permissionGranted = permissionCheck == PackageManager.PERMISSION_GRANTED;
     promise.resolve(permissionGranted);
   }
 
   @ReactMethod
-  public void prepareRecordingAtPath(String recordingPath, ReadableMap recordingSettings, Promise promise) {
-    if (isRecording){
+  public void prepareRecordingAtPath(String recordingPath, ReadableMap recordingSettings, Promise promise)
+  {
+    if (isRecording)
+    {
       logAndRejectPromise(promise, "INVALID_STATE", "Please call stopRecording before starting recording");
     }
     File destFile = new File(recordingPath);
-    if (destFile.getParentFile() != null) {
+    if (destFile.getParentFile() != null)
+    {
       destFile.getParentFile().mkdirs();
     }
+    int SAMPLING_RATE = 44100;
+    int AUDIO_SOURCE = MediaRecorder.AudioSource.MIC;
+    int CHANNEL_IN_CONFIG = AudioFormat.CHANNEL_IN_MONO;
+    int AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT;
+    int BUFFER_SIZE = AudioRecord.getMinBufferSize(SAMPLING_RATE, CHANNEL_IN_CONFIG, AUDIO_FORMAT);
+    audioData = new byte[BUFFER_SIZE];
+    audioRecorder =  new AudioRecord(AUDIO_SOURCE, SAMPLING_RATE, CHANNEL_IN_CONFIG, AUDIO_FORMAT, BUFFER_SIZE);
+    /*
     recorder = new MediaRecorder();
-    try {
+    try
+    {
       recorder.setAudioSource(recordingSettings.getInt("AudioSource"));
       int outputFormat = getOutputFormatFromString(recordingSettings.getString("OutputFormat"));
       recorder.setOutputFormat(outputFormat);
-      if("lpcm".equalsIgnoreCase(recordingSettings.getString("AudioEncoding"))
-        ) {
-        if(16 == recordingSettings.getInt("AVLinearPCMBitDepthKey")) {
-          recorder.setAudioEncoder(AudioFormat.ENCODING_PCM_16BIT);
-        } else if(32 == recordingSettings.getInt("AVLinearPCMBitDepthKey")) {
-          recorder.setAudioEncoder(AudioFormat.ENCODING_PCM_FLOAT);
-        } else if(8 == recordingSettings.getInt("AVLinearPCMBitDepthKey")) {
-          recorder.setAudioEncoder(AudioFormat.ENCODING_PCM_8BIT);
-        } else {
+      if("lpcm".equalsIgnoreCase(recordingSettings.getString("AudioEncoding")))
+      {
+        if(16 == recordingSettings.getInt("AVLinearPCMBitDepthKey"))
+        {
           recorder.setAudioEncoder(AudioFormat.ENCODING_PCM_16BIT);
         }
-      } else {      
+        else if(32 == recordingSettings.getInt("AVLinearPCMBitDepthKey"))
+        {
+          recorder.setAudioEncoder(AudioFormat.ENCODING_PCM_FLOAT);
+        }
+        else if(8 == recordingSettings.getInt("AVLinearPCMBitDepthKey"))
+        {
+          recorder.setAudioEncoder(AudioFormat.ENCODING_PCM_8BIT);
+        }
+        else
+        {
+          recorder.setAudioEncoder(AudioFormat.ENCODING_PCM_16BIT);
+        }
+      }
+      else
+      {
         int audioEncoder = getAudioEncoderFromString(recordingSettings.getString("AudioEncoding"));
         recorder.setAudioEncoder(audioEncoder);
       }
+      int channel = AudioFormat.CHANNEL_IN_MONO;
       recorder.setAudioSamplingRate(recordingSettings.getInt("SampleRate"));
       recorder.setAudioChannels(recordingSettings.getInt("Channels"));
+      //recorder.setAudioChannels(channel);
       recorder.setAudioEncodingBitRate(recordingSettings.getInt("AudioEncodingBitRate"));
       recorder.setOutputFile(destFile.getPath());
-      includeBase64 = recordingSettings.getBoolean("IncludeBase64");
-    }
-    catch(final Exception e) {
-      logAndRejectPromise(promise, "COULDNT_CONFIGURE_MEDIA_RECORDER" , "Make sure you've added RECORD_AUDIO permission to your AndroidManifest.xml file "+e.getMessage());
-      return;
-    }
 
+      includeBase64 = recordingSettings.getBoolean("IncludeBase64");
+    }*/
+    includeBase64 = recordingSettings.getBoolean("IncludeBase64");
     currentOutputFile = recordingPath;
-    try {
-      recorder.prepare();
+    try
+    {
+    //  recorder.prepare();
       promise.resolve(currentOutputFile);
-    } catch (final Exception e) {
+    }
+    catch (final Exception e)
+    {
       logAndRejectPromise(promise, "COULDNT_PREPARE_RECORDING_AT_PATH "+recordingPath, e.getMessage());
     }
 
   }
 
-  private int getAudioEncoderFromString(String audioEncoder) {
-   switch (audioEncoder) {
+  private int getAudioEncoderFromString(String audioEncoder)
+  {
+   switch (audioEncoder)
+   {
      case "aac":
        return MediaRecorder.AudioEncoder.AAC;
      case "aac_eld":
@@ -179,8 +214,10 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
    }
   }
 
-  private int getOutputFormatFromString(String outputFormat) {
-    switch (outputFormat) {
+  private int getOutputFormatFromString(String outputFormat)
+  {
+    switch (outputFormat)
+    {
       case "mpeg_4":
         return MediaRecorder.OutputFormat.MPEG_4;
       case "aac_adts":
@@ -200,29 +237,77 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
     }
   }
 
+  String filePathRaw = Environment.getExternalStorageDirectory().getPath() + "/" + AUDIO_RECORDING_FILE_NAME;
+  BufferedOutputStream os = null;
+  public void recordRawAudio()
+  {
+    android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO);
+    audioRecorder.startRecording();
+
+    try
+    {
+      os = new BufferedOutputStream(new FileOutputStream(filePathRaw));
+      while (!isPaused)
+      {
+        int status = audioRecorder.read(audioData, 0, audioData.length);
+
+        if (status == AudioRecord.ERROR_INVALID_OPERATION || status == AudioRecord.ERROR_BAD_VALUE)
+        {
+          Log.e("RECORDING", "Error reading audio data!");
+          return;
+        }
+
+        try
+        {
+          os.write(audioData, 0, audioData.length);
+        }
+        catch (IOException e)
+        {
+          Log.e("RECORDING", "Error saving recording ", e);
+          return;
+        }
+      }
+    }
+    catch (FileNotFoundException e)
+    {
+      Log.e("RECORDING", "File not found for recording ", e);
+    }
+  }
   @ReactMethod
-  public void startRecording(Promise promise){
-    if (recorder == null){
+  public void startRecording(Promise promise)
+  {
+    if (audioRecorder == null)
+    {
       logAndRejectPromise(promise, "RECORDING_NOT_PREPARED", "Please call prepareRecordingAtPath before starting recording");
       return;
     }
-    if (isRecording){
+    if (isRecording)
+    {
       logAndRejectPromise(promise, "INVALID_STATE", "Please call stopRecording before starting recording");
       return;
     }
-    recorder.start();
-
     stopWatch.reset();
     stopWatch.start();
     isRecording = true;
     isPaused = false;
     startTimer();
     promise.resolve(currentOutputFile);
+    new Thread(new Runnable()
+    {
+      @Override
+      public void run()
+      {
+        recordRawAudio();
+      }
+    }).start();
+
   }
 
   @ReactMethod
-  public void stopRecording(Promise promise){
-    if (!isRecording){
+  public void stopRecording(Promise promise)
+  {
+    if (!isRecording)
+    {
       logAndRejectPromise(promise, "INVALID_STATE", "Please call startRecording before stopping recording");
       return;
     }
@@ -230,18 +315,35 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
     stopTimer();
     isRecording = false;
     isPaused = false;
+    try
+    {
+      os.close();
+      audioRecorder.stop();
+      audioRecorder.release();
+      Log.v("RECORDING", "Recording done…");
+      File rawFile = new File(filePathRaw);
+      File wavFile = new File(currentOutputFile);
+      rawToWave(rawFile,wavFile);
 
-    try {
-      recorder.stop();
-      recorder.release();
+    }
+    catch (IOException e)
+    {
+      Log.e("RECORDING", "Error when releasing", e);
+    }
+    try
+    {
+   //   recorder.stop();
+   //   recorder.release();
       stopWatch.stop();
     }
-    catch (final RuntimeException e) {
+    catch (final RuntimeException e)
+    {
       // https://developer.android.com/reference/android/media/MediaRecorder.html#stop()
       logAndRejectPromise(promise, "RUNTIME_EXCEPTION", "No valid audio data received. You may be using a device that can't record audio.");
       return;
     }
-    finally {
+    finally
+    {
       recorder = null;
     }
 
@@ -252,29 +354,56 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
     result.putString("audioFileURL", "file://" + currentOutputFile);
 
     String base64 = "";
-    if (includeBase64) {
-      try {
+    if (includeBase64)
+    {
+      try
+      {
         InputStream inputStream = new FileInputStream(currentOutputFile);
         byte[] bytes;
         byte[] buffer = new byte[8192];
         int bytesRead;
         ByteArrayOutputStream output = new ByteArrayOutputStream();
-        try {
-          while ((bytesRead = inputStream.read(buffer)) != -1) {
+        try
+        {
+          while ((bytesRead = inputStream.read(buffer)) != -1)
+          {
             output.write(buffer, 0, bytesRead);
           }
-        } catch (IOException e) {
+        }
+        catch (IOException e)
+        {
           Log.e(TAG, "FAILED TO PARSE FILE");
         }
         bytes = output.toByteArray();
         base64 = Base64.encodeToString(bytes, Base64.DEFAULT);
-      } catch(FileNotFoundException e) {
+      }
+      catch(FileNotFoundException e)
+      {
         Log.e(TAG, "FAILED TO FIND FILE");
+      } catch (IOException e) {
+        e.printStackTrace();
       }
     }
     result.putString("base64", base64);
 
     sendEvent("recordingFinished", result);
+  }
+
+  private void writeInt(final DataOutputStream output, final int value) throws IOException {
+    output.write(value >> 0);
+    output.write(value >> 8);
+    output.write(value >> 16);
+    output.write(value >> 24);
+  }
+  private void writeShort(final DataOutputStream output, final short value) throws IOException {
+    output.write(value >> 0);
+    output.write(value >> 8);
+  }
+
+  private void writeString(final DataOutputStream output, final String value) throws IOException {
+    for (int i = 0; i < value.length(); i++) {
+      output.write(value.charAt(i));
+    }
   }
 
   @ReactMethod
@@ -300,8 +429,10 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
   }
 
   @ReactMethod
-  public void resumeRecording(Promise promise) {
-    if (!isPauseResumeCapable || resumeMethod == null) {
+  public void resumeRecording(Promise promise)
+  {
+    if (!isPauseResumeCapable || resumeMethod == null)
+    {
       logAndRejectPromise(promise, "RUNTIME_EXCEPTION", "Method not available on this version of Android.");
       return;
     }
@@ -335,8 +466,65 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
     }, 0, 1000);
   }
 
-  private void stopTimer(){
-    if (timer != null) {
+  private void rawToWave(final File oldWaveFile, final File newWaveFile) throws IOException
+  {
+    byte[] rawData = new byte[(int) oldWaveFile.length()];
+    DataInputStream input = null;
+    try
+    {
+      input = new DataInputStream(new FileInputStream(oldWaveFile));
+      input.read(rawData);
+    }
+    finally
+    {
+      if (input != null)
+      {
+        input.close();
+      }
+    }
+    DataOutputStream output = null;
+    try
+    {
+      output = new DataOutputStream(new FileOutputStream(newWaveFile));
+      // WAVE header
+      writeString(output, "RIFF"); // chunk id
+      writeInt(output, 36 + rawData.length); // chunk size
+      writeString(output, "WAVE"); // format
+      writeString(output, "fmt "); // subchunk 1 id
+      writeInt(output, 16); // subchunk 1 size
+      writeShort(output, (short) 1); // audio format (1 = PCM)
+      writeShort(output, (short) 1); // number of channels
+      writeInt(output, 44100); // sample rate
+      writeInt(output, 44100 * 2); // byte rate
+      writeShort(output, (short) 2); // block align
+      writeShort(output, (short) 16); // bits per sample
+      writeString(output, "data"); // subchunk 2 id
+      writeInt(output, rawData.length); // subchunk 2 size
+      // Audio data (conversion big endian -> little endian)
+      short[] shorts = new short[rawData.length / 2];
+      ByteBuffer.wrap(rawData).order(ByteOrder.BIG_ENDIAN).asShortBuffer().get(shorts);
+      ByteBuffer bytes = ByteBuffer.allocate(shorts.length * 2);
+      for (short s : shorts) {
+        bytes.putShort(s);
+      }
+      output.write(bytes.array());
+    }
+    finally
+    {
+      if (output != null)
+      {
+        output.close();
+        oldWaveFile.delete();
+      }
+    }
+
+
+  }
+
+  private void stopTimer()
+  {
+    if (timer != null)
+    {
       timer.cancel();
       timer.purge();
       timer = null;
