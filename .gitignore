@@ -21,7 +21,7 @@ DerivedData
 *.ipa
 *.xcuserstate
 project.xcworkspace
-
+*~
 # Cocoapods
 Pods/
 
@@ -34,5 +34,6 @@ android/.gradle/
 android/gradle/
 android/gradlew
 android/gradlew.bat
+android/local.properties
 .idea
 /nbproject/
