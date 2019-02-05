@@ -132,7 +132,7 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
     }
   }
 
-  private int getPCMChannels() {
+  private short getPCMChannels() {
     if(channelConfig = AudioFormat.CHANNEL_IN_STEREO) {
       return 2;
     } else {
@@ -142,31 +142,39 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
   }
 
   private boolean isPcm() {
-    audioFormat == AudioFormat.ENCODING_PCM_16BIT ||
+    return audioFormat == AudioFormat.ENCODING_PCM_16BIT ||
             audioFormat == AudioFormat.ENCODING_PCM_FLOAT ||
             audioFormat == AudioFormat.ENCODING_PCM_8BIT;
   }
 
-  private int getPCMBitDepthKey() {
-    if(audioFormat == AudioFormat.ENCODING_PCM_16BIT) {
+  private short getPCMBitDepthKey()
+  {
+    if(audioFormat == AudioFormat.ENCODING_PCM_16BIT)
+    {
       return 16;
-    } else if(AudioFormat.ENCODING_PCM_FLOAT) {
+    }
+    else if(audioFormat == AudioFormat.ENCODING_PCM_FLOAT)
+    {
       return 32;
-    } else if(AudioFormat.ENCODING_PCM_8BIT) {
+    }
+    else if(audioFormat == AudioFormat.ENCODING_PCM_8BIT)
+    {
       return 8;
     }
+    return 16;
   }
 
-  private int getPCMAudioFormat() {
-    if(16 == recordingSettings.getInt("AVLinearPCMBitDepthKey"))
+  private short getPCMAudioFormat(int pcmBitDepthKey)
+  {
+    if(16 == pcmBitDepthKey)
     {
       return AudioFormat.ENCODING_PCM_16BIT;
     }
-    else if(32 == recordingSettings.getInt("AVLinearPCMBitDepthKey"))
+    else if(32 == pcmBitDepthKey)
     {
       return AudioFormat.ENCODING_PCM_FLOAT;
     }
-    else if(8 == recordingSettings.getInt("AVLinearPCMBitDepthKey"))
+    else if(8 == pcmBitDepthKey)
     {
       return AudioFormat.ENCODING_PCM_8BIT;
     }
@@ -529,13 +537,13 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
     }
   }
 
-  private void rawToWave(final File oldWaveFile, final File newWaveFile) throws IOException
+  private void rawToWave(final File rawFile, final File newWaveFile) throws IOException
   {
-    byte[] rawData = new byte[(int) oldWaveFile.length()];
+    byte[] rawData = new byte[(int) rawFile.length()];
     DataInputStream input = null;
     try
     {
-      input = new DataInputStream(new FileInputStream(oldWaveFile));
+      input = new DataInputStream(new FileInputStream(rawFile));
       input.read(rawData);
     }
     finally
@@ -549,13 +557,12 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
     try
     {
       short bitsPerSample = getPCMBitDepthKey();
-      int numChannels = getPCMChannels();
-      long rawDataLength = [rawPCM length];
+      short numChannels = getPCMChannels();
 
       int byteRate = numChannels*bitsPerSample*samplingRate/8;
-      short blockAlign = numChannels*bitsPerSample/8;
+      short blockAlign = (short)numChannels*bitsPerSample/8;
       int chunkSize = 16;
-      int totalSize = 36 + rawDataLength;
+      int totalSize = 36 + rawData.length;
       //int totalSize = 36 + rawDataLength;
       short audioFormat = 1; //1 for PCM
 
@@ -589,7 +596,7 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
       if (output != null)
       {
         output.close();
-        oldWaveFile.delete();
+        rawFile.delete();
       }
     }
 
