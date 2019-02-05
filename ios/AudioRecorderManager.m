@@ -167,8 +167,8 @@ return data;
   
   NSURL *audioFileURL;
   if(_audioEncoding == [NSNumber numberWithInt:kAudioFormatLinearPCM]) {
-    audioFileURL = [self getAndCreatePlayableFileFromPcmData: _audioFileURL];
-    //audioFileURL = _audioFileURL;
+    //audioFileURL = [self getAndCreatePlayableFileFromPcmData: _audioFileURL];
+    audioFileURL = _audioFileURL;
   } else {
     audioFileURL = _audioFileURL;
   }
