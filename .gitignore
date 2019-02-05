@@ -30,7 +30,9 @@ Pods/
 node_modules/
 npm-debug.log
 
+android/.gradle/
 android/gradle/
 android/gradlew
 android/gradlew.bat
 .idea
+/nbproject/
