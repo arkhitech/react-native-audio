@@ -133,7 +133,7 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
   }
 
   private short getPCMChannels() {
-    if(channelConfig = AudioFormat.CHANNEL_IN_STEREO) {
+    if(channelConfig == AudioFormat.CHANNEL_IN_STEREO) {
       return 2;
     } else {
       return 1;
@@ -560,7 +560,7 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
       short numChannels = getPCMChannels();
 
       int byteRate = numChannels*bitsPerSample*samplingRate/8;
-      short blockAlign = (short)numChannels*bitsPerSample/8;
+      short blockAlign = (short)(numChannels*bitsPerSample/8);
       int chunkSize = 16;
       int totalSize = 36 + rawData.length;
       //int totalSize = 36 + rawDataLength;
