@@ -78,8 +78,28 @@ RCT_EXPORT_MODULE();
   [_progressUpdateTimer addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
 }
 
-- (NSURL *) getAndCreatePlayableFileFromPcmData:(NSURL *)fileURL
-{
+- (NSData *)stripCAFHeader: (NSString *) path {
+NSFileManager* fileMgr = [NSFileManager defaultManager];
+
+//Load the file in
+NSData* dataBuffer = [fileMgr contentsAtPath: path];
+//This is the data header
+NSData* searchString = [NSData dataWithBytes:"data" length:4];
+
+//Find where the header starts
+NSUInteger dataWordStart = [dataBuffer rangeOfData:searchString options:0 range:NSMakeRange(0,[dataBuffer length])].location;
+
+//Create the new range without the header
+//4 bytes for the DATA word, 8 bytes for the data length, and 4 bytes for the edit count
+NSRange dataRange = NSMakeRange(dataWordStart + 4 + 4 + 8, [dataBuffer length] - dataWordStart - 4 - 4 - 8);
+
+//Copy the new data
+NSData *data = [dataBuffer subdataWithRange:dataRange];
+return data;
+}
+
+- (NSURL *) getAndCreatePlayableFileFromPcmData:(NSURL *)fileURL {
+
   NSString* filePath = [fileURL absoluteString];
   NSString *wavFileName = [[filePath lastPathComponent] stringByDeletingPathExtension];
   NSString *wavFileFullName = [NSString stringWithFormat:@"%@.wav",wavFileName];
@@ -88,16 +108,16 @@ RCT_EXPORT_MODULE();
   NSArray *dirPaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
   NSString *docsDir = [dirPaths objectAtIndex:0];
   NSString *wavFilePath = [docsDir stringByAppendingPathComponent:wavFileFullName];
+
   
-  
-  FILE *fout;
-  
+  NSData* rawPCM = [self stripCAFHeader:filePath];
+
   NSNumber* bits = [_audioRecorder.settings objectForKey:AVLinearPCMBitDepthKey];
   short bitsPerSample = [bits shortValue];
   int numChannels = [_audioChannels intValue];
   int sampleRate = [_audioSampleRate intValue];
-  long rawDataLength = [[NSData dataWithContentsOfFile:filePath] length];
-  
+  long rawDataLength = [rawPCM length];
+
   int byteRate = numChannels*bitsPerSample*sampleRate/8;
   //int byteRate = numChannels*sampleRate * 2; //TODO should be sending 2 or not?
   short blockAlign = numChannels*bitsPerSample/8;
@@ -105,12 +125,16 @@ RCT_EXPORT_MODULE();
   int totalSize = 36 + rawDataLength;
   //int totalSize = 36 + rawDataLength;
   short audioFormat = 1; //1 for PCM
+
+  Byte *header = (Byte*)malloc(44);
   
+  FILE *fout;
+
   if((fout = fopen([wavFilePath cStringUsingEncoding:1], "w")) == NULL)
   {
     printf("Error opening out file ");
   }
-  
+
   fwrite("RIFF", 1, 4,fout);
   fwrite(&totalSize, 4, 1, fout);
   fwrite("WAVE", 1, 4, fout);
@@ -121,21 +145,18 @@ RCT_EXPORT_MODULE();
   fwrite(&sampleRate, 4, 1, fout);
   fwrite(&byteRate, 4, 1, fout);
   fwrite(&blockAlign, 2, 1, fout);
-  
+
   fwrite(&bitsPerSample, 2, 1, fout);
   fwrite("data", 1, 4, fout);
   fwrite(&rawDataLength, 4, 1, fout);
-  
+
   fclose(fout);
+
+  NSMutableData *pamdata = [NSMutableData dataWithContentsOfFile:wavFilePath];
+  [pamdata appendData:rawPCM];
   
-  NSMutableData *pamdata = [NSMutableData dataWithContentsOfFile:filePath];
-  NSFileHandle *handle;
-  handle = [NSFileHandle fileHandleForUpdatingAtPath:wavFilePath];
-  [handle seekToEndOfFile];
-  [handle writeData:pamdata];
-  [handle closeFile];
-  
-  return [NSURL URLWithString:wavFilePath];
+  [pamdata writeToURL:wavFilePath atomically:true];
+  return [NSURL fileURLWithPath:wavFilePath];
 }
 
 - (void)audioRecorderDidFinishRecording:(AVAudioRecorder *)recorder successfully:(BOOL)flag {
@@ -143,6 +164,7 @@ RCT_EXPORT_MODULE();
   NSURL *audioFileURL;
   if(_audioEncoding == [NSNumber numberWithInt:kAudioFormatLinearPCM]) {
     audioFileURL = [self getAndCreatePlayableFileFromPcmData: _audioFileURL];
+    //audioFileURL = _audioFileURL;
   } else {
     audioFileURL = _audioFileURL;
   }
@@ -385,6 +407,7 @@ RCT_EXPORT_METHOD(prepareRecordingAtPathWithSettings:(NSString *)path settings:(
   NSNumber* pcmBitDepthKey = [RCTConvert NSNumber:settings[@"AVLinearPCMBitDepthKey"]];
   if (pcmBitDepthKey != nil) {
     [recordOptions setValue:pcmBitDepthKey forKey:AVLinearPCMBitDepthKey];
+    //[recordOptions setValue:@YES forKey:AVLinearPCMIsBigEndianKey];
   }
   [self initAudioRecorderWithSettings: recordOptions];
 }

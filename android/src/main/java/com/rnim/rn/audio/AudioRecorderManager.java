@@ -119,6 +119,63 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
     promise.resolve(permissionGranted);
   }
 
+  int samplingRate = 44100;
+  int audioSource = MediaRecorder.AudioSource.MIC;
+  int channelConfig = AudioFormat.CHANNEL_IN_MONO;
+  int audioFormat = AudioFormat.ENCODING_PCM_16BIT;
+
+  private void setPCMChannelConfig(int numChannels) {
+    if(numChannels > 1) {
+      channelConfig = AudioFormat.CHANNEL_IN_STEREO;
+    } else {
+      channelConfig = AudioFormat.CHANNEL_IN_MONO;
+    }
+  }
+
+  private int getPCMChannels() {
+    if(channelConfig = AudioFormat.CHANNEL_IN_STEREO) {
+      return 2;
+    } else {
+      return 1;
+    }
+
+  }
+
+  private boolean isPcm() {
+    audioFormat == AudioFormat.ENCODING_PCM_16BIT ||
+            audioFormat == AudioFormat.ENCODING_PCM_FLOAT ||
+            audioFormat == AudioFormat.ENCODING_PCM_8BIT;
+  }
+
+  private int getPCMBitDepthKey() {
+    if(audioFormat == AudioFormat.ENCODING_PCM_16BIT) {
+      return 16;
+    } else if(AudioFormat.ENCODING_PCM_FLOAT) {
+      return 32;
+    } else if(AudioFormat.ENCODING_PCM_8BIT) {
+      return 8;
+    }
+  }
+
+  private int getPCMAudioFormat() {
+    if(16 == recordingSettings.getInt("AVLinearPCMBitDepthKey"))
+    {
+      return AudioFormat.ENCODING_PCM_16BIT;
+    }
+    else if(32 == recordingSettings.getInt("AVLinearPCMBitDepthKey"))
+    {
+      return AudioFormat.ENCODING_PCM_FLOAT;
+    }
+    else if(8 == recordingSettings.getInt("AVLinearPCMBitDepthKey"))
+    {
+      return AudioFormat.ENCODING_PCM_8BIT;
+    }
+    else
+    {
+      return AudioFormat.ENCODING_PCM_16BIT;
+    }
+  }
+
   @ReactMethod
   public void prepareRecordingAtPath(String recordingPath, ReadableMap recordingSettings, Promise promise)
   {
@@ -131,65 +188,52 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
     {
       destFile.getParentFile().mkdirs();
     }
-    int SAMPLING_RATE = 44100;
-    int AUDIO_SOURCE = MediaRecorder.AudioSource.MIC;
-    int CHANNEL_IN_CONFIG = AudioFormat.CHANNEL_IN_MONO;
-    int AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT;
-    int BUFFER_SIZE = AudioRecord.getMinBufferSize(SAMPLING_RATE, CHANNEL_IN_CONFIG, AUDIO_FORMAT);
-    audioData = new byte[BUFFER_SIZE];
-    audioRecorder =  new AudioRecord(AUDIO_SOURCE, SAMPLING_RATE, CHANNEL_IN_CONFIG, AUDIO_FORMAT, BUFFER_SIZE);
-    /*
-    recorder = new MediaRecorder();
-    try
-    {
-      recorder.setAudioSource(recordingSettings.getInt("AudioSource"));
-      int outputFormat = getOutputFormatFromString(recordingSettings.getString("OutputFormat"));
-      recorder.setOutputFormat(outputFormat);
-      if("lpcm".equalsIgnoreCase(recordingSettings.getString("AudioEncoding")))
-      {
-        if(16 == recordingSettings.getInt("AVLinearPCMBitDepthKey"))
-        {
-          recorder.setAudioEncoder(AudioFormat.ENCODING_PCM_16BIT);
-        }
-        else if(32 == recordingSettings.getInt("AVLinearPCMBitDepthKey"))
-        {
-          recorder.setAudioEncoder(AudioFormat.ENCODING_PCM_FLOAT);
-        }
-        else if(8 == recordingSettings.getInt("AVLinearPCMBitDepthKey"))
-        {
-          recorder.setAudioEncoder(AudioFormat.ENCODING_PCM_8BIT);
-        }
-        else
-        {
-          recorder.setAudioEncoder(AudioFormat.ENCODING_PCM_16BIT);
-        }
-      }
-      else
-      {
-        int audioEncoder = getAudioEncoderFromString(recordingSettings.getString("AudioEncoding"));
-        recorder.setAudioEncoder(audioEncoder);
-      }
-      int channel = AudioFormat.CHANNEL_IN_MONO;
-      recorder.setAudioSamplingRate(recordingSettings.getInt("SampleRate"));
-      recorder.setAudioChannels(recordingSettings.getInt("Channels"));
-      //recorder.setAudioChannels(channel);
-      recorder.setAudioEncodingBitRate(recordingSettings.getInt("AudioEncodingBitRate"));
-      recorder.setOutputFile(destFile.getPath());
 
-      includeBase64 = recordingSettings.getBoolean("IncludeBase64");
-    }*/
     includeBase64 = recordingSettings.getBoolean("IncludeBase64");
     currentOutputFile = recordingPath;
-    try
+    if("lpcm".equalsIgnoreCase(recordingSettings.getString("AudioEncoding")))
     {
-    //  recorder.prepare();
+      this.samplingRate = recordingSettings.getInt("SampleRate");
+      this.audioFormat = getPCMAudioFormat(recordingSettings.getInt("AVLinearPCMBitDepthKey"));
+      this.setPCMChannelConfig(recordingSettings.getInt("Channels"));
+
+      int bufferSize = AudioRecord.getMinBufferSize(samplingRate, channelConfig, audioFormat);
+      audioData = new byte[bufferSize];
+      audioRecorder =  new AudioRecord(audioSource, samplingRate, channelConfig, audioFormat, bufferSize);
       promise.resolve(currentOutputFile);
     }
-    catch (final Exception e)
+    else
     {
-      logAndRejectPromise(promise, "COULDNT_PREPARE_RECORDING_AT_PATH "+recordingPath, e.getMessage());
-    }
+      try
+      {
+        recorder = new MediaRecorder();
+        recorder.setAudioSource(recordingSettings.getInt("AudioSource"));
+        int outputFormat = getOutputFormatFromString(recordingSettings.getString("OutputFormat"));
+        recorder.setOutputFormat(outputFormat);
 
+        int audioEncoder = getAudioEncoderFromString(recordingSettings.getString("AudioEncoding"));
+        recorder.setAudioEncoder(audioEncoder);
+
+        recorder.setAudioSamplingRate(recordingSettings.getInt("SampleRate"));
+        recorder.setAudioChannels(recordingSettings.getInt("Channels"));
+        recorder.setAudioEncodingBitRate(recordingSettings.getInt("AudioEncodingBitRate"));
+        recorder.setOutputFile(destFile.getPath());
+        try
+        {
+          recorder.prepare();
+          promise.resolve(currentOutputFile);
+        }
+        catch (final Exception e)
+        {
+          logAndRejectPromise(promise, "COULDNT_PREPARE_RECORDING_AT_PATH " + recordingPath, e.getMessage());
+        }
+      }
+      catch(final Exception e)
+      {
+        logAndRejectPromise(promise, "COULDNT_CONFIGURE_MEDIA_RECORDER" , "Make sure you've added RECORD_AUDIO permission to your AndroidManifest.xml file "+e.getMessage());
+        return;
+      }
+    }
   }
 
   private int getAudioEncoderFromString(String audioEncoder)
@@ -286,21 +330,25 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
       logAndRejectPromise(promise, "INVALID_STATE", "Please call stopRecording before starting recording");
       return;
     }
+    if(isPcm()) {
+      new Thread(new Runnable()
+      {
+        @Override
+        public void run()
+        {
+          recordRawAudio();
+        }
+      }).start();
+
+    } else {
+      recorder.start();
+    }
     stopWatch.reset();
     stopWatch.start();
     isRecording = true;
     isPaused = false;
     startTimer();
     promise.resolve(currentOutputFile);
-    new Thread(new Runnable()
-    {
-      @Override
-      public void run()
-      {
-        recordRawAudio();
-      }
-    }).start();
-
   }
 
   @ReactMethod
@@ -317,14 +365,21 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
     isPaused = false;
     try
     {
-      os.close();
-      audioRecorder.stop();
-      audioRecorder.release();
-      Log.v("RECORDING", "Recording done…");
-      File rawFile = new File(filePathRaw);
-      File wavFile = new File(currentOutputFile);
-      rawToWave(rawFile,wavFile);
+      if(isPcm()) {
+        if(os != null) {
+          os.close();
+        }
+        audioRecorder.stop();
+        audioRecorder.release();
+        Log.v("RECORDING", "Recording done…");
+        File rawFile = new File(filePathRaw);
+        File wavFile = new File(currentOutputFile);
 
+        rawToWave(rawFile, wavFile);
+      } else {
+        recorder.stop();
+        recorder.release();
+      }
     }
     catch (IOException e)
     {
@@ -332,8 +387,6 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
     }
     try
     {
-   //   recorder.stop();
-   //   recorder.release();
       stopWatch.stop();
     }
     catch (final RuntimeException e)
@@ -466,6 +519,16 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
     }, 0, 1000);
   }
 
+  private void stopTimer()
+  {
+    if (timer != null)
+    {
+      timer.cancel();
+      timer.purge();
+      timer = null;
+    }
+  }
+
   private void rawToWave(final File oldWaveFile, final File newWaveFile) throws IOException
   {
     byte[] rawData = new byte[(int) oldWaveFile.length()];
@@ -485,19 +548,31 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
     DataOutputStream output = null;
     try
     {
+      short bitsPerSample = getPCMBitDepthKey();
+      int numChannels = getPCMChannels();
+      long rawDataLength = [rawPCM length];
+
+      int byteRate = numChannels*bitsPerSample*samplingRate/8;
+      short blockAlign = numChannels*bitsPerSample/8;
+      int chunkSize = 16;
+      int totalSize = 36 + rawDataLength;
+      //int totalSize = 36 + rawDataLength;
+      short audioFormat = 1; //1 for PCM
+
       output = new DataOutputStream(new FileOutputStream(newWaveFile));
       // WAVE header
       writeString(output, "RIFF"); // chunk id
       writeInt(output, 36 + rawData.length); // chunk size
       writeString(output, "WAVE"); // format
       writeString(output, "fmt "); // subchunk 1 id
-      writeInt(output, 16); // subchunk 1 size
-      writeShort(output, (short) 1); // audio format (1 = PCM)
-      writeShort(output, (short) 1); // number of channels
-      writeInt(output, 44100); // sample rate
-      writeInt(output, 44100 * 2); // byte rate
-      writeShort(output, (short) 2); // block align
-      writeShort(output, (short) 16); // bits per sample
+      writeInt(output, chunkSize); // subchunk 1 size
+      writeShort(output, (short) audioFormat); // audio format (1 = PCM)
+
+      writeShort(output, (short) numChannels); // number of channels
+      writeInt(output, this.samplingRate); // sample rate
+      writeInt(output, byteRate); // byte rate
+      writeShort(output, (short) blockAlign); // block align
+      writeShort(output, (short) bitsPerSample); // bits per sample
       writeString(output, "data"); // subchunk 2 id
       writeInt(output, rawData.length); // subchunk 2 size
       // Audio data (conversion big endian -> little endian)
@@ -518,17 +593,6 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
       }
     }
 
-
-  }
-
-  private void stopTimer()
-  {
-    if (timer != null)
-    {
-      timer.cancel();
-      timer.purge();
-      timer = null;
-    }
   }
 
   private void sendEvent(String eventName, Object params) {
