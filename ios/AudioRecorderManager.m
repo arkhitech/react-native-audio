@@ -130,10 +130,9 @@ return data;
   short audioFormat = 1;
 
   Byte *header = (Byte*)malloc(44);
-  
+
   FILE *fout;
 
-    
   if((fout = fopen([wavFilePath cStringUsingEncoding:1], "w")) == NULL)
   {
     printf("Error opening out file ");
