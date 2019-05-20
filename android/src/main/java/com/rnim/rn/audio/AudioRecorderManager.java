@@ -384,24 +384,41 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
     isPaused = false;
     try
     {
-      if(isPcm()) {
-        if(os != null) {
+      if(isPcm())
+      {
+        if(os != null)
+        {
           os.close();
         }
         audioRecorder.stop();
         audioRecorder.release();
         Log.v("RECORDING", "Recording done…");
         File rawFile = new File(filePathRaw);
-        File wavFile = new File(currentOutputFile);
-
-        rawToWave(rawFile, wavFile);
-      } else {
+        if(rawFile.exists())
+        {
+          File wavFile = new File(currentOutputFile);
+          rawToWave(rawFile, wavFile);
+        }
+        else
+        {
+          WritableMap result = Arguments.createMap();
+          result.putBoolean("recordingFailed",true);
+          sendEvent("recordingFailed", result);
+          logAndRejectPromise(promise, "RECORDING_FILE_NOT_FOUND", "Please re-record");
+        }
+      }
+      else
+      {
         recorder.stop();
         recorder.release();
       }
     }
     catch (IOException e)
     {
+      WritableMap result = Arguments.createMap();
+      result.putBoolean("recordingFailed",true);
+      sendEvent("recordingFailed", result);
+      logAndRejectPromise(promise, "RECORDING_FILE_NOT_FOUND", "Please re-record");
       Log.e("RECORDING", "Error when releasing", e);
     }
     try
@@ -410,6 +427,9 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
     }
     catch (final RuntimeException e)
     {
+      WritableMap result = Arguments.createMap();
+      result.putBoolean("recordingFailed",true);
+      sendEvent("recordingFailed", result);
       // https://developer.android.com/reference/android/media/MediaRecorder.html#stop()
       logAndRejectPromise(promise, "RUNTIME_EXCEPTION", "No valid audio data received. You may be using a device that can't record audio.");
       return;
@@ -430,7 +450,7 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
     {
       try
       {
-        InputStream inputStream = new FileInputStream(currentOutputFile);
+        InputStream inputStream = new FileInputStream("dsfafsdfgag");
         byte[] bytes;
         byte[] buffer = new byte[8192];
         int bytesRead;
@@ -444,6 +464,10 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
         }
         catch (IOException e)
         {
+          WritableMap errorResult = Arguments.createMap();
+          errorResult.putBoolean("recordingFailed",true);
+          sendEvent("recordingFailed", errorResult);
+          logAndRejectPromise(promise, "RECORDING_FILE_NOT_FOUND", "Please re-record");
           Log.e(TAG, "FAILED TO PARSE FILE");
         }
         bytes = output.toByteArray();
@@ -451,9 +475,19 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
       }
       catch(FileNotFoundException e)
       {
+        WritableMap errorResult = Arguments.createMap();
+        errorResult.putBoolean("recordingFailed",true);
+        sendEvent("recordingFailed", errorResult);
+        logAndRejectPromise(promise, "RECORDING_FILE_NOT_FOUND", "Please re-record");
         Log.e(TAG, "FAILED TO FIND FILE");
-      } catch (IOException e) {
+      }
+      catch (IOException e)
+      {
+        WritableMap errorResult = Arguments.createMap();
+        errorResult.putBoolean("recordingFailed",true);
+        sendEvent("recordingFailed", errorResult);
         e.printStackTrace();
+        logAndRejectPromise(promise, "RECORDING_NOT_PREPARED", "Please call prepareRecordingAtPath before starting recording");
       }
     }
     result.putString("base64", base64);
