@@ -481,14 +481,6 @@ class AudioRecorderManager extends ReactContextBaseJavaModule {
         logAndRejectPromise(promise, "RECORDING_FILE_NOT_FOUND", "Please re-record");
         Log.e(TAG, "FAILED TO FIND FILE");
       }
-      catch (IOException e)
-      {
-        WritableMap errorResult = Arguments.createMap();
-        errorResult.putBoolean("recordingFailed",true);
-        sendEvent("recordingFailed", errorResult);
-        e.printStackTrace();
-        logAndRejectPromise(promise, "RECORDING_NOT_PREPARED", "Please call prepareRecordingAtPath before starting recording");
-      }
     }
     result.putString("base64", base64);
 
